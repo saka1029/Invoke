@@ -24,7 +24,7 @@ public class Reader {
         try {
             return ch = reader.read();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new InvokeException(e);
         }
     }
    
@@ -59,14 +59,14 @@ public class Reader {
                 get();
                 return builder.build();
             case EOF:
-                throw new RuntimeException("')' expected");
+                throw new InvokeException("')' expected");
             default:
                 Object r = readObject();
                 if (r == DOT) {
                     Object last = read();
                     skipSpaces();
                     if (ch != ')')
-                        throw new RuntimeException("')' expected");
+                        throw new InvokeException("')' expected");
                     get();
                     builder.last(last);
                     return builder.build();
@@ -90,12 +90,35 @@ public class Reader {
         }
     }
     
-    Object readNumber(StringBuilder sb) {
+    Integer readNumber(StringBuilder sb) {
         while (isDigit(ch)) {
             sb.append((char)ch);
             get();
         }
         return Integer.parseInt(sb.toString());
+    }
+    
+    String readString(StringBuilder sb) {
+        sb.deleteCharAt(0);
+        while (ch != EOF && ch != '\n' && ch != '\r' && ch != '"') {
+            switch (ch) {
+            case '\\':
+                switch (get()) {
+                case 'r': sb.append("\r"); break;
+                case 'n': sb.append("\n"); break;
+                case 't': sb.append("\t"); break;
+                default: sb.append(ch); break;
+                }
+                break;
+            default:
+                sb.append((char)ch);
+            }
+            get();
+        }
+        if (ch != '"')
+            throw new InvokeException("Unterminated string: %s", sb);
+        get();
+        return sb.toString();
     }
 
     Object readAtom() {
@@ -108,6 +131,8 @@ public class Reader {
             return isDigit(ch) ? readNumber(sb) : readSymbol(sb);
         case '.':
             return isSymbol(ch) ? readSymbol(sb) : DOT;
+        case '"':
+            return readString(sb);
         default:
             return isDigit(first) ? readNumber(sb) : readSymbol(sb);
         }
@@ -137,7 +162,7 @@ public class Reader {
     public Object read() {
         Object r = readObject();
         if (r == DOT)
-            throw new RuntimeException("unexpected dot");
+            throw new InvokeException("unexpected dot");
         return r;
     }
 }

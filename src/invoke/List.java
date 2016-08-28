@@ -2,9 +2,6 @@ package invoke;
 
 public interface List extends Evaluable {
     
-    default Object car() { throw new InvokeException("cannot car of %s", this); }
-    default Object cdr() { throw new InvokeException("cannot cdr of %s", this); }
-    
     static final List NIL = new List() {
 
         public String toString() {
@@ -16,6 +13,24 @@ public interface List extends Evaluable {
             return this;
         };
     };
+    
+    default Object car() { throw new InvokeException("cannot car of %s", this); }
+    default Object cdr() { throw new InvokeException("cannot cdr of %s", this); }
+
+    default int size() {
+        int count = 0;
+        for (Object obj = this; obj instanceof Pair; obj = ((Pair)obj).cdr)
+            ++count;
+        return count;
+    }
+
+    default Object[] toArray() {
+        Object[] result = new Object[size()];
+        int i = 0;
+        for (Object obj = this; obj instanceof Pair; obj = ((Pair)obj).cdr)
+            result[i++] = ((Pair)obj).car;
+        return result;
+    }
 
     public static class Builder {
 
@@ -48,6 +63,5 @@ public interface List extends Evaluable {
         public Object build() {
             return head;
         }
-
     }
 }

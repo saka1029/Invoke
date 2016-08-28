@@ -22,6 +22,9 @@ public class Pair implements List {
     
     @Override
     public String toString() {
+        if (cdr instanceof Pair && ((Pair)cdr).cdr == NIL) {
+            if (car == Global.QUOTE) return "'" + ((Pair)cdr).car;
+        }
         StringBuilder sb = new StringBuilder();
         sb.append("(").append(car);
         Object obj = cdr;

@@ -16,6 +16,21 @@ public class Symbol implements Evaluable {
         return map.computeIfAbsent(name, n -> new Symbol(n));
     }
     
+    public static Symbol selfEvaluatedOf(String name) {
+        return map.computeIfAbsent(name, n -> new SelfEvaluatedSymbol(n));
+    }
+    
+    public static class SelfEvaluatedSymbol extends Symbol {
+        private SelfEvaluatedSymbol(String name) {
+            super(name);
+        }
+        
+        @Override
+        public Object eval(Env env) {
+            return this;
+        }
+    }
+    
     @Override
     public String toString() {
         return name;
