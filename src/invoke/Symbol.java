@@ -6,7 +6,7 @@ import java.util.Map;
 public class Symbol implements Evaluable {
 
     private static final Map<String, Symbol> map = new HashMap<>();
-    private final String name;
+    final String name;
     
     private Symbol(String name) {
         this.name = name;

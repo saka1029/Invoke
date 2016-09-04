@@ -24,6 +24,9 @@ public class Pair implements List {
     public String toString() {
         if (cdr instanceof Pair && ((Pair)cdr).cdr == NIL) {
             if (car == Global.QUOTE) return "'" + ((Pair)cdr).car;
+            if (car == Global.BACKQUOTE) return "`" + ((Pair)cdr).car;
+            if (car == Global.UNQUOTE) return "," + ((Pair)cdr).car;
+            if (car == Global.SPLICE) return ",@" + ((Pair)cdr).car;
         }
         StringBuilder sb = new StringBuilder();
         sb.append("(").append(car);

@@ -1,4 +1,4 @@
-package test;
+package test.invoke;
 
 import static org.junit.Assert.*;
 import static invoke.Global.*;

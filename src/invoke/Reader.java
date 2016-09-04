@@ -154,6 +154,16 @@ public class Reader {
         case '\'':
             get();
             return list(QUOTE, read());
+        case '`':
+            get();
+            return list(BACKQUOTE, read());
+        case ',':
+            get();
+            if (ch == '@') {
+                get();
+                return list(SPLICE, read());
+            } else
+                return list(UNQUOTE, read());
         default:
             return readAtom();
         }

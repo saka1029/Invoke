@@ -5,6 +5,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
+import reflection.Reflection;
 
 public class Global {
 
@@ -20,6 +21,9 @@ public class Global {
     public static final List NIL = List.NIL;
     public static final Boolean TRUE = Boolean.TRUE;
     public static final Boolean FALSE = Boolean.FALSE;
+    public static final Symbol BACKQUOTE = Symbol.of("backquote");
+    public static final Symbol UNQUOTE = Symbol.of("unquote");
+    public static final Symbol SPLICE = Symbol.of("splice");
 
     static {
         define(symbol("Boolean"), Boolean.class);
@@ -36,33 +40,55 @@ public class Global {
 
         defineSyntax("define", (args, env) ->
             car(args) instanceof Pair
-                ? env.define((Symbol)car(car(args)), new Closure(cdr(car(args)), cdr(args), env))
-                : env.define((Symbol)car(args), eval(car(cdr(args)), env)));
+                ? env.define((Symbol)caar(args), new Closure(cdar(args), cdr(args), env))
+                : env.define((Symbol)car(args), eval(cadr(args), env)));
 
         defineSyntax("set!", (args, env) ->
-            env.set((Symbol)car(args), eval(car(cdr(args)), env)));
+            env.set((Symbol)car(args), eval(cadr(args), env)));
 
         defineSyntax("if", (args, env) ->
-            eval(car(args), env) != FALSE ? eval(car(cdr(args)), env)
-            : cdr(cdr(args)) != NIL ? eval(car(cdr(cdr(args))), env)
+            eval(car(args), env) != FALSE ? eval(cadr(args), env)
+            : cddr(args) != NIL ? eval(caddr(args), env)
             : UNDEF);
 
-        defineSyntax(LAMBDA, (Applicable) (args, env) ->
+        defineSyntax(LAMBDA, (args, env) ->
             new Closure(car(args), cdr(args), env)
         );
+        
+        defineSyntax(BACKQUOTE, (args, env) -> backquote(car(args), env));
+        
+        defineSyntax("define-macro", (args, env) ->
+            car(args) instanceof Pair
+                ? env.define((Symbol)caar(args),
+                    new Macro(new Closure(cdar(args), cdr(args), env)))
+                : env.define((Symbol)car(args),
+                    new Macro((Closure)eval(cadr(args), env))));
+
+        defineSyntax(INVOKE, (args, env) -> invoke(args, env));
+        defineSyntax(FIELD, (args, env) -> field(args, env));
     }
     
     static {
-        defineProcedure(INVOKE, args -> invoke(args));
-        defineProcedure(FIELD, args -> field(args));
-        defineProcedure("car", args -> car(car(args)));
-        defineProcedure("cdr", args -> cdr(car(args)));
-        defineProcedure("cons", args -> cons(car(args), car(cdr(args))));
+        defineProcedure("car", args -> caar(args));
+        defineProcedure("cdr", args -> cdar(args));
+        defineProcedure("caar", args -> caaar(args));
+        defineProcedure("cadr", args -> cadar(args));
+        defineProcedure("cdar", args -> cdaar(args));
+        defineProcedure("cddr", args -> cddar(args));
+        defineProcedure("caaar", args -> caaar(car(args)));
+        defineProcedure("caadr", args -> caadr(car(args)));
+        defineProcedure("cadar", args -> cadar(car(args)));
+        defineProcedure("caddr", args -> caddr(car(args)));
+        defineProcedure("cdaar", args -> cdaar(car(args)));
+        defineProcedure("cdadr", args -> cdadr(car(args)));
+        defineProcedure("cddar", args -> cddar(car(args)));
+        defineProcedure("cdddr", args -> cdddr(car(args)));
+        defineProcedure("cons", args -> cons(car(args), cadr(args)));
         defineProcedure("list", args -> args);
         defineProcedure("pair?", args -> car(args) instanceof Pair);
         defineProcedure("null?", args -> car(args) == NIL);
-        defineProcedure("eq?", args -> car(args) == car(cdr(args)));
-        defineProcedure("equal?", args -> car(args).equals(car(cdr(args))));
+        defineProcedure("eq?", args -> car(args) == cadr(args));
+        defineProcedure("equal?", args -> car(args).equals(cadr(args)));
         defineProcedure("display", args -> {
             for (; args instanceof Pair; args = cdr(args))
                 System.out.println(car(args));
@@ -76,25 +102,37 @@ public class Global {
     }
 
     static {
-        defineProcedure("=", args -> car(args).equals(car(cdr(args))));
-        defineProcedure("<", args -> compare(car(args), car(cdr(args))) < 0);
-        defineProcedure("<=", args -> compare(car(args), car(cdr(args))) <= 0);
-        defineProcedure(">", args -> compare(car(args), car(cdr(args))) > 0);
-        defineProcedure(">=", args -> compare(car(args), car(cdr(args))) >= 0);
+        defineProcedure("=", args -> car(args).equals(cadr(args)));
+        defineProcedure("<", args -> compare(car(args), cadr(args)) < 0);
+        defineProcedure("<=", args -> compare(car(args), cadr(args)) <= 0);
+        defineProcedure(">", args -> compare(car(args), cadr(args)) > 0);
+        defineProcedure(">=", args -> compare(car(args), cadr(args)) >= 0);
         defineProcedure("+", args -> reduce(0, (a, b) -> (int)a + (int)b, args));
         defineProcedure("-", args -> reduce(0, (a, b) -> (int)a - (int)b, args));
         defineProcedure("*", args -> reduce(1, (a, b) -> (int)a * (int)b, args));
         defineProcedure("/", args -> reduce(1, (a, b) -> (int)a / (int)b, args));
     }
     
+    static Object quote(Object obj) {
+        return list(QUOTE, obj);
+    }
+
     static Object letStar(Object vars, Object body) {
         return vars == NIL
             ? list(cons(LAMBDA, cons(NIL, body)))
-            : list(cons(LAMBDA, list(list(car(car(vars))),
+            : list(cons(LAMBDA, list(list(caar(vars)),
                     letStar(cdr(vars), body))),
-                car(cdr(car(vars))));
+                cadar(vars));
     }
 
+    /*
+     * (define-macro (@ obj .args)
+     *    (if (null? args)"
+     *        obj"
+     *        (if (pair? (car args))"
+     *            `(cascade (invoke ,obj ',(caar args) ,@(cdar args)) ,@(cdr args))"
+     *            `(cascade (field ,obj ',(car args)) ,@(cdr args)))))
+     */
     static Object cascade(Object object, Object methods) {
         if (methods == NIL)
             return object;
@@ -102,35 +140,52 @@ public class Global {
             return cascade(
                 cons(INVOKE,
                     cons(object,
-                        cons(list(QUOTE, car(car(methods))),
-                            cdr(car(methods))))),
+                        cons(caar(methods),
+                            cdar(methods)))),
                 cdr(methods));
         else
             return cascade(
-                list( FIELD, object, list(QUOTE, car(methods))),
+                list( FIELD, object, car(methods)),
                 cdr(methods));
     }
 
     static {
         defineMacro("let", args ->
             car(args) instanceof Pair
-                ? cons(cons(LAMBDA, cons(map(x -> car(x), car(args)), cdr(args))),
-                    map(x -> car(cdr(x)), car(args)))
-                : list(list(LAMBDA,
-                    list(car(args)),
-                    list(symbol("set!"), car(args),
-                        cons(LAMBDA,
-                            cons(map(x -> car(x), car(cdr(args))),
-                                cdr(cdr(args))))),
-                    cons(car(args), map(x -> car(cdr(x)), car(cdr(args))))),
+                ? cons(
+                    cons(
+                        LAMBDA,
+                        cons(
+                            map(x -> car(x), car(args)),
+                            cdr(args))),
+                    map(x -> cadr(x), car(args)))
+                : list(
+                    list(
+                        LAMBDA,
+                        list(car(args)),
+                        list(
+                            symbol("set!"),
+                            car(args),
+                            cons(
+                                LAMBDA,
+                                cons(
+                                    map(x -> car(x), cadr(args)),
+                                    cddr(args)))),
+                        cons(car(args), map(x -> car(cdr(x)), cadr(args)))),
                     UNDEF));
 
         defineMacro("let*", args ->
             letStar(car(args), cdr(args)));
 
         defineMacro("letrec", (Expandable) args ->
-            cons(cons(LAMBDA, cons(map(x -> car(x), car(args)),
-                append(map(x -> cons(symbol("set!"), x), car(args)), cdr(args)))),
+            cons(
+                cons(
+                    LAMBDA,
+                    cons(
+                        map(x -> car(x), car(args)),
+                        append(
+                            map(x -> cons(symbol("set!"), x), car(args)),
+                            cdr(args)))),
                 map(x -> FALSE, car(args))));
 
         defineMacro("begin", args -> letStar(NIL, args));
@@ -180,13 +235,20 @@ public class Global {
         return Symbol.of(name);
     }
 
-    public static Object car(Object obj) {
-        return ((List) obj).car();
-    }
-
-    public static Object cdr(Object obj) {
-        return ((List) obj).cdr();
-    }
+    public static Object car(Object obj) { return ((List) obj).car(); }
+    public static Object cdr(Object obj) { return ((List) obj).cdr(); }
+    public static Object caar(Object obj) { return car(car(obj)); }
+    public static Object cadr(Object obj) { return car(cdr(obj)); }
+    public static Object cdar(Object obj) { return cdr(car(obj)); }
+    public static Object cddr(Object obj) { return cdr(cdr(obj)); }
+    public static Object caaar(Object obj) { return car(car(car(obj))); }
+    public static Object caadr(Object obj) { return car(car(cdr(obj))); }
+    public static Object cadar(Object obj) { return car(cdr(car(obj))); }
+    public static Object caddr(Object obj) { return car(cdr(cdr(obj))); }
+    public static Object cdaar(Object obj) { return cdr(car(car(obj))); }
+    public static Object cdadr(Object obj) { return cdr(car(cdr(obj))); }
+    public static Object cddar(Object obj) { return cdr(cdr(car(obj))); }
+    public static Object cdddr(Object obj) { return cdr(cdr(cdr(obj))); }
 
     public static Pair cons(Object car, Object cdr) {
         return new Pair(car, cdr);
@@ -228,9 +290,16 @@ public class Global {
         return result;
     }
 
-    public static Object field(Object args) {
-        Object self = car(args);
-        String name = car(cdr(args)).toString();
+    static Object evlis(Object args, Env env) {
+        List.Builder b = new List.Builder();
+        for (; args instanceof Pair; args = cdr(args))
+            b.tail(eval(car(args), env));
+        return b.build();
+    }
+
+    public static Object field(Object args, Env env) {
+        Object self = eval(car(args), env);
+        String name = ((Symbol)cadr(args)).name;
         try {
             return Reflection.field(self, name);
         } catch (IllegalArgumentException
@@ -240,15 +309,15 @@ public class Global {
         }
     }
 
-    public static Object invoke(Object args) {
-        Object self = car(args);
-        String name = car(cdr(args)).toString();
-        Object[] arguments = ((List) cdr(cdr(args))).toArray();
+    public static Object invoke(Object args, Env env) {
+        Object self = eval(car(args), env);
+        String name = ((Symbol)cadr(args)).name;
+        Object[] arguments = ((List)evlis(cddr(args), env)).toArray();
         try {
             if (name.equals("new"))
-                return Reflection.constructor(self, arguments);
+                return Reflection.construct((Class<?>)self, arguments);
             else
-                return Reflection.method(self, name, arguments);
+                return Reflection.invoke(self, name, arguments);
         } catch (InstantiationException
             | IllegalAccessException
             | IllegalArgumentException
@@ -257,4 +326,26 @@ public class Global {
             throw new InvokeException(e);
         }
     }
+
+    static Object backquote(Object obj, Env env) {
+        if (obj instanceof Pair)
+            if (car(obj) instanceof Pair)
+                if (caar(obj) == UNQUOTE)
+                    return cons(
+                        eval(cadar(obj), env),
+                        backquote(cdr(obj), env));
+                else if (car(car(obj)) == SPLICE)
+                    return append(
+                        eval(cadar(obj), env),
+                        backquote(cdr(obj), env));
+                else
+                    return cons(
+                        backquote(car(obj), env),
+                        backquote(cdr(obj), env));
+            else
+                return cons(car(obj), backquote(cdr(obj), env));
+        else
+            return obj;
+    }
+
 }
