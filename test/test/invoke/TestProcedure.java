@@ -1,11 +1,11 @@
-package test;
+package test.invoke;
 
 import static org.junit.Assert.*;
 
 import org.junit.Test;
 import static invoke.Global.*;
 
-public class TestLispProcedure {
+public class TestProcedure {
 
     @Test
     public void testCar() {

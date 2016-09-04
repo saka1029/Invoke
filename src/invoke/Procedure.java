@@ -2,19 +2,19 @@ package invoke;
 
 import static invoke.Global.*;
 
-public interface Procedure extends Applicable {
+import reflection.Functional;
+
+public interface Procedure extends Applicable, Functional {
 
     Object apply(Object args);
     
-    static Object evlis(Object args, Env env) {
-        List.Builder b = new List.Builder();
-        for (; args instanceof Pair; args = cdr(args))
-            b.tail(eval(car(args), env));
-        return b.build();
-    }
-
     @Override
     default Object apply(Object args, Env env) {
         return apply(evlis(args, env));
+    }
+    
+    @Override
+    default Object apply(Object[] args) {
+        return apply(list(args));
     }
 }

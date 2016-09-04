@@ -1,11 +1,11 @@
-package test;
+package test.invoke;
 
 import static org.junit.Assert.*;
 import static invoke.Global.*;
 
 import org.junit.Test;
 
-public class TestLispSyntax {
+public class TestSyntax {
 
     @Test
     public void testQuoteSymbol() {
