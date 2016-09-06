@@ -11,7 +11,12 @@ public class Lang {
     public static Object cdar(Pair a) { return ((Pair)a.car).cdr; }
     public static Object cddr(Pair a) { return ((Pair)a.cdr).cdr; }
     public static Pair cons(Object a, Object b) { return new Pair(a, b); }
-    public static Object list(Object... a) { return Global.list(a); }
+    public static List list(Object... a) {
+        List r = Global.NIL;
+        for (int i = a.length - 1; i >= 0; --i)
+            r = cons(a[i], r);
+        return r;
+    }
     public static boolean pairp(Object a) { return a instanceof Pair; }
     public static boolean nullp(Object a) { return a == Global.NIL; }
     public static boolean eqp(Object a, Object b) { return a == b; }

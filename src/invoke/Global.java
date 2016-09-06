@@ -99,15 +99,11 @@ public class Global {
         defineMacro("/", LANG, "divide", -2, 1);
     }
     
-    static Object quote(Object obj) {
-        return list(QUOTE, obj);
-    }
-
     static Object letStar(Object vars, Object body) {
         return vars == NIL
-            ? list(cons(LAMBDA, cons(NIL, body)))
-            : list(cons(LAMBDA, list(list(caar(vars)),
-                    letStar(cdr(vars), body))),
+            ? list(list(LAMBDA, NIL, splice(body)))
+            : list(list(LAMBDA, splice(list(list(caar(vars)),
+                    letStar(cdr(vars), body)))),
                 cadar(vars));
     }
 
