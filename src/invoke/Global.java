@@ -3,7 +3,6 @@ package invoke;
 import java.io.StringReader;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
-import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 import reflection.Reflection;
 
@@ -17,13 +16,15 @@ public class Global {
     public static final Symbol LAMBDA = Symbol.of("lambda");
     public static final Symbol INVOKE = Symbol.of("invoke");
     public static final Symbol FIELD = Symbol.of("field");
-    public static final Symbol UNDEF = Symbol.selfEvaluatedOf("*UNDEF*");
+    public static final Symbol UNDEF = Symbol.Keyword.of("*UNDEF*");
     public static final List NIL = List.NIL;
     public static final Boolean TRUE = Boolean.TRUE;
     public static final Boolean FALSE = Boolean.FALSE;
     public static final Symbol BACKQUOTE = Symbol.of("backquote");
     public static final Symbol UNQUOTE = Symbol.of("unquote");
     public static final Symbol SPLICE = Symbol.of("splice");
+    public static final Symbol CASCADE = Symbol.of("@");
+    public static final Symbol LANG = symbol("Lang");
 
     static {
         define(symbol("Boolean"), Boolean.class);
@@ -33,6 +34,7 @@ public class Global {
         define(symbol("int"), Integer.TYPE);
         define(symbol("System"), System.class);
         define(symbol("Array"), Array.class);
+        define(LANG, Lang.class);
     }
     
     static {
@@ -47,7 +49,7 @@ public class Global {
             env.set((Symbol)car(args), eval(cadr(args), env)));
 
         defineSyntax("if", (args, env) ->
-            eval(car(args), env) != FALSE ? eval(cadr(args), env)
+            !eval(car(args), env).equals(FALSE) ? eval(cadr(args), env)
             : cddr(args) != NIL ? eval(caddr(args), env)
             : UNDEF);
 
@@ -69,48 +71,32 @@ public class Global {
     }
     
     static {
-        defineProcedure("car", args -> caar(args));
-        defineProcedure("cdr", args -> cdar(args));
-        defineProcedure("caar", args -> caaar(args));
-        defineProcedure("cadr", args -> cadar(args));
-        defineProcedure("cdar", args -> cdaar(args));
-        defineProcedure("cddr", args -> cddar(args));
-        defineProcedure("caaar", args -> caaar(car(args)));
-        defineProcedure("caadr", args -> caadr(car(args)));
-        defineProcedure("cadar", args -> cadar(car(args)));
-        defineProcedure("caddr", args -> caddr(car(args)));
-        defineProcedure("cdaar", args -> cdaar(car(args)));
-        defineProcedure("cdadr", args -> cdadr(car(args)));
-        defineProcedure("cddar", args -> cddar(car(args)));
-        defineProcedure("cdddr", args -> cdddr(car(args)));
-        defineProcedure("cons", args -> cons(car(args), cadr(args)));
-        defineProcedure("list", args -> args);
-        defineProcedure("pair?", args -> car(args) instanceof Pair);
-        defineProcedure("null?", args -> car(args) == NIL);
-        defineProcedure("eq?", args -> car(args) == cadr(args));
-        defineProcedure("equal?", args -> car(args).equals(cadr(args)));
-        defineProcedure("display", args -> {
-            for (; args instanceof Pair; args = cdr(args))
-                System.out.println(car(args));
-            return UNDEF;
-        });
-            
+        defineMacro("car", LANG, "car", 1);
+        defineMacro("cdr", LANG, "cdr", 1);
+        defineMacro("caar", LANG, "caar", 1);
+        defineMacro("cadr", LANG, "cadr", 1);
+        defineMacro("cdar", LANG, "cdar", 1);
+        defineMacro("cddr", LANG, "cddr", 1);
+        defineMacro("cons", LANG, "cons", 2);
+        defineMacro("list", LANG, "list", -1);
+        defineMacro("pair?", LANG, "pairp", 1);
+        defineMacro("null?", LANG, "nullp", 1);
+        defineMacro("eq?", LANG, "eqp", 2);
+        defineMacro("equal?", LANG, "equalp", 2);
+        defineMacro("display", LANG, "display", -1);
     }
     
-    static int compare(Object a, Object b) {
-        return ((Comparable)a).compareTo((Comparable)b);
-    }
-
     static {
-        defineProcedure("=", args -> car(args).equals(cadr(args)));
-        defineProcedure("<", args -> compare(car(args), cadr(args)) < 0);
-        defineProcedure("<=", args -> compare(car(args), cadr(args)) <= 0);
-        defineProcedure(">", args -> compare(car(args), cadr(args)) > 0);
-        defineProcedure(">=", args -> compare(car(args), cadr(args)) >= 0);
-        defineProcedure("+", args -> reduce(0, (a, b) -> (int)a + (int)b, args));
-        defineProcedure("-", args -> reduce(0, (a, b) -> (int)a - (int)b, args));
-        defineProcedure("*", args -> reduce(1, (a, b) -> (int)a * (int)b, args));
-        defineProcedure("/", args -> reduce(1, (a, b) -> (int)a / (int)b, args));
+        defineMacro("==", LANG, "eq", 2);
+        defineMacro("!=", LANG, "ne", 2);
+        defineMacro("<", LANG, "lt", 2);
+        defineMacro("<=", LANG, "le", 2);
+        defineMacro(">", LANG, "gt", 2);
+        defineMacro(">=", LANG, "ge", 2);
+        defineMacro("+", LANG, "plus", -2, 0);
+        defineMacro("-", LANG, "minus", -2, 0);
+        defineMacro("*", LANG, "multiply", -2, 1);
+        defineMacro("/", LANG, "divide", -2, 1);
     }
     
     static Object quote(Object obj) {
@@ -133,63 +119,122 @@ public class Global {
      *            `(cascade (invoke ,obj ',(caar args) ,@(cdar args)) ,@(cdr args))"
      *            `(cascade (field ,obj ',(car args)) ,@(cdr args)))))
      */
-    static Object cascade(Object object, Object methods) {
-        if (methods == NIL)
-            return object;
-        if (car(methods) instanceof Pair)
-            return cascade(
-                cons(INVOKE,
-                    cons(object,
-                        cons(caar(methods),
-                            cdar(methods)))),
-                cdr(methods));
-        else
-            return cascade(
-                list( FIELD, object, car(methods)),
-                cdr(methods));
+    static Object cascade(Object object, Object args) {
+//        if (args == NIL)
+//            return object;
+//        if (car(args) instanceof Pair)
+//            return cascade(
+//                cons(INVOKE,
+//                    cons(object,
+//                        cons(caar(args),
+//                            cdar(args)))),
+//                cdr(args));
+//        else
+//            return cascade(
+//                list( FIELD, object, car(args)),
+//                cdr(args));
+        return args == NIL
+            ? object
+            : car(args) instanceof Pair
+                ? cascade(list(INVOKE, object, caar(args), splice(cdar(args))), cdr(args))
+                : cascade(list(FIELD, object, car(args)), cdr(args));
     }
 
+    /*
+     * (let loop ((r 1) (i 1))
+     *     (if (> i n)
+     *         r
+     *         (loop (* r i) (+ i 1))))
+     * 
+     * ->
+     * 
+     * (
+     *     (lambda (loop)
+     *         (set! loop
+     *             (lambda (r i)
+     *                 (if (> i n)
+     *                     r
+     *                     (loop (* r i) (+ i 1)))))
+     *         (loop 1 1))
+     *     *UNDEF*)
+     * 
+     * (define-macro let
+     *   (lambda (args . body)
+     *     (if (pair? args)
+     *         `((lambda ,(map car args) ,@body) ,@(map cadr args))
+     *       `(letrec ((,args (lambda ,(map car (car body)) ,@(cdr body))))
+     *         (,args ,@(map cadr (car body)))))))
+     */
     static {
         defineMacro("let", args ->
+//            car(args) instanceof Pair
+//                ? cons(cons(LAMBDA,
+//                    cons(map(x -> car(x), car(args)), 
+//                        list(cdr(args))),
+//                    map(x -> cadr(x), car(args)))
+//                : list(list(LAMBDA,
+//                    list(car(args)),
+//                    list(symbol("set!"), car(args),
+//                        cons(LAMBDA, cons(
+//                            map(x -> car(x), cadr(args)),
+//                            cddr(args)))),
+//                        cons(car(args), map(x -> cadr(x), cadr(args)))),
+//                    UNDEF));
             car(args) instanceof Pair
-                ? cons(
-                    cons(
-                        LAMBDA,
-                        cons(
-                            map(x -> car(x), car(args)),
-                            cdr(args))),
-                    map(x -> cadr(x), car(args)))
+                ? list(
+                    list(LAMBDA, map(x -> car(x), car(args)), splice(cdr(args))),
+                    splice(map(x -> cadr(x), car(args))))
                 : list(
-                    list(
-                        LAMBDA,
+                    list(LAMBDA,
                         list(car(args)),
-                        list(
-                            symbol("set!"),
-                            car(args),
-                            cons(
-                                LAMBDA,
-                                cons(
-                                    map(x -> car(x), cadr(args)),
-                                    cddr(args)))),
-                        cons(car(args), map(x -> car(cdr(x)), cadr(args)))),
+                        list(symbol("set!"), car(args),
+                            list(LAMBDA, map(x -> car(x), cadr(args)), splice(cddr(args)))),
+                        list(car(args), splice(map(x -> cadr(x), cadr(args))))),
                     UNDEF));
+
 
         defineMacro("let*", args ->
             letStar(car(args), cdr(args)));
 
-        defineMacro("letrec", (Expandable) args ->
-            cons(
-                cons(
-                    LAMBDA,
-                    cons(
-                        map(x -> car(x), car(args)),
-                        append(
-                            map(x -> cons(symbol("set!"), x), car(args)),
-                            cdr(args)))),
-                map(x -> FALSE, car(args))));
+        /*
+         * (letrec (
+         *     (f (lambda (i)
+         *         (if (<= i 1)
+         *             1
+         *             (* i (f (- i 1)))))))
+         *     (f n))
+         * 
+         * ->
+         * 
+         * (
+         *     (lambda (f)
+         *         (set! f (lambda (i)
+         *             (if (<= i 1)
+         *                 1
+         *                 (* i (f (- i 1))))))
+         *         (f n))
+         *     false)
+         * 
+         */
+        defineMacro("letrec", args ->
+//            cons(
+//                cons(
+//                    LAMBDA,
+//                    cons(
+//                        map(x -> car(x), car(args)),
+//                        append(
+//                            map(x -> cons(symbol("set!"), x), car(args)),
+//                            cdr(args)))),
+//                map(x -> UNDEF, car(args))));
+            list(
+                list(LAMBDA,
+                    map(x -> car(x), car(args)),
+                    splice(map(x -> cons(symbol("set!"), x), car(args))),
+                    splice(cdr(args))),
+                splice(map(x -> UNDEF, car(args)))));
 
         defineMacro("begin", args -> letStar(NIL, args));
-        defineMacro("@", args -> cascade(car(args), cdr(args)));
+        defineMacro(CASCADE, args -> cascade(car(args), cdr(args)));
     }
 
     public static void define(Symbol key, Object value) {
@@ -204,16 +249,76 @@ public class Global {
         define(symbol(name), value);
     }
 
-    static void defineProcedure(Symbol key, Procedure value) {
-        define(key, value);
+//    static void defineProcedure(Symbol key, Procedure value) {
+//        define(key, value);
+//    }
+//
+//    static void defineProcedure(String name, Procedure value) {
+//        define(symbol(name), value);
+//    }
+
+    static class NamedExpandable implements Expandable {
+        
+        Expandable expandable;
+        Symbol name;
+
+        NamedExpandable(Symbol name, Expandable expandable) {
+            this.expandable = expandable;
+            this.name = name;
+        }
+
+        @Override
+        public Object apply(Object args, Env env) {
+            Object expanded = expand(args);
+            Object evaled = eval(expanded, env);
+            System.out.println("expand: " + new Pair(name, args) + " -> " + expanded + " -> " + evaled);
+            return evaled;
+        }
+
+        @Override
+        public Object expand(Object args) {
+            return expandable.expand(args);
+        }
     }
 
-    static void defineProcedure(String name, Procedure value) {
-        define(symbol(name), value);
+    static void defineMacro(Symbol symbol, Expandable value) {
+        define(symbol, new NamedExpandable(symbol, value));
     }
 
     static void defineMacro(String name, Expandable value) {
-        define(symbol(name), value);
+        defineMacro(symbol(name), value);
+    }
+    
+    public static Object multiaryOperator(Symbol self, Symbol method, Object unit, Object args) {
+        Object prev = null;
+        int i = 0;
+        for (; args instanceof Pair; args = cdr(args)) {
+            Object e = car(args);
+            switch (i++) {
+            case 0: prev = e; break;
+            case 1: unit = prev; break;
+            }
+            unit = list(INVOKE, self, method, unit, e);
+        }
+        return unit;
+    }
+
+    static void defineMacro(String name, Symbol cls, String methodName, int argSize, Object unit) {
+        Symbol method = symbol(methodName);
+        Expandable value;
+        switch (argSize) {
+        case -2: value = args -> multiaryOperator(cls, method, unit, args); break;
+        case -1: value = args -> list(INVOKE, cls, method, splice(args)); break;
+        case 0: value = args -> list(INVOKE, cls, method); break;
+        case 1: value = args -> list(INVOKE, cls, method, car(args)); break;
+        case 2: value = args -> list(INVOKE, cls, method, car(args), cadr(args)); break;
+        case 3: value = args -> list(INVOKE, cls, method, car(args), cadr(args), caddr(args)); break;
+        default: throw new IllegalArgumentException("too many args");
+        }
+        defineMacro(name, value);
+    }
+    static void defineMacro(String name, Symbol cls, String methodName, int argSize) {
+        defineMacro(name, cls, methodName, argSize, null);
     }
 
     public static Object eval(Object obj, Env env) {
@@ -224,7 +329,9 @@ public class Global {
     }
 
     public static Object eval(Object obj) {
-        return eval(obj, ENV);
+        Object evaled = eval(obj, ENV);
+        System.out.println("eval: " + obj + " -> " + evaled);
+        return evaled;
     }
 
     public static Object read(String s) {
@@ -253,12 +360,40 @@ public class Global {
     public static Pair cons(Object car, Object cdr) {
         return new Pair(car, cdr);
     }
+    
+    static class Splice {
+
+        Object list;
+
+        public Splice(Object list) {
+            if (!(list instanceof List))
+                throw new IllegalArgumentException("list");
+            this.list = list;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("(Splice %s)", list);
+        }
+    }
+    
+    public static Splice splice(Object element) {
+        return new Splice(element);
+    }
 
     public static Object list(Object... objects) {
-        Object r = NIL;
-        for (int i = objects.length - 1; i >= 0; --i)
-            r = cons(objects[i], r);
-        return r;
+//        Object r = NIL;
+//        for (int i = objects.length - 1; i >= 0; --i)
+//            r = cons(objects[i], r);
+//        return r;
+        List.Builder b = new List.Builder();
+        for (Object e : objects)
+            if (e instanceof Splice)
+                for (Object f = ((Splice)e).list; f instanceof Pair; f = cdr(f))
+                    b.tail(car(f));
+            else
+                b.tail(e);
+        return b.build();
     }
     
     public static Object append(Object... lists) {
@@ -276,20 +411,6 @@ public class Global {
         return b.build();
     }
 
-    public static Object reduce(Object unit, BinaryOperator<Object> f, Object list) {
-        Object result = unit;
-        Object prev = null;
-        int i = 0;
-        for (; list instanceof Pair; list = cdr(list)) {
-            switch (i++) {
-            case 0: prev = car(list); break;
-            case 1: result = prev;
-            }
-            result = f.apply(result, car(list));
-        }
-        return result;
-    }
-
     static Object evlis(Object args, Env env) {
         List.Builder b = new List.Builder();
         for (; args instanceof Pair; args = cdr(args))
@@ -297,7 +418,7 @@ public class Global {
         return b.build();
     }
 
-    public static Object field(Object args, Env env) {
+    static Object field(Object args, Env env) {
         Object self = eval(car(args), env);
         String name = ((Symbol)cadr(args)).name;
         try {
@@ -309,7 +430,7 @@ public class Global {
         }
     }
 
-    public static Object invoke(Object args, Env env) {
+    static Object invoke(Object args, Env env) {
         Object self = eval(car(args), env);
         String name = ((Symbol)cadr(args)).name;
         Object[] arguments = ((List)evlis(cddr(args), env)).toArray();
@@ -347,5 +468,4 @@ public class Global {
         else
             return obj;
     }
-
 }

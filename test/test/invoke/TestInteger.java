@@ -9,17 +9,32 @@ public class TestInteger {
   
     @Test
     public void testNumEqTrue() {
-        assertEquals(read("true"), eval(read("(= 2 2)")));
+        assertEquals(read("true"), eval(read("(== 2 2)")));
     }
   
     @Test
     public void testNumEqFalse() {
-        assertEquals(read("false"), eval(read("(= 1 2)")));
+        assertEquals(read("false"), eval(read("(== 1 2)")));
     }
   
     @Test
     public void testNumEqFalseNotNum() {
-        assertEquals(read("false"), eval(read("(= 1 'a)")));
+        assertEquals(read("false"), eval(read("(== 1 'a)")));
+    }
+  
+    @Test
+    public void testNumNeTrue() {
+        assertEquals(read("true"), eval(read("(!= 1 2)")));
+    }
+  
+    @Test
+    public void testNumNeFalse() {
+        assertEquals(read("false"), eval(read("(!= 2 2)")));
+    }
+  
+    @Test
+    public void testNumNeFalseNotNum() {
+        assertEquals(read("true"), eval(read("(!= 1 'a)")));
     }
     
     @Test

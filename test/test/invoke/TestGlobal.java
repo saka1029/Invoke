@@ -5,6 +5,8 @@ import static invoke.Global.*;
 
 import org.junit.Test;
 
+import invoke.Symbol;
+
 public class TestGlobal {
     
     static void test(String expected, String test) {
@@ -42,6 +44,33 @@ public class TestGlobal {
         test("true", "(equal? '(a b) '(a b))");
         test("false", "(equal? '(a b) '(a x))");
         test("false", "(equal? '(a b) '(x b))");
+    }
+    
+    @Test
+    public void testListSplice() {
+        Object inner = list("b", "c");
+        assertEquals(list("a", "b", "c", "d"), list("a", splice(inner), "d"));
+        assertEquals(list("a", "d"), list("a", splice(NIL), "d"));
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testListSpliceError() {
+        assertEquals(list("a", "d"), list("a", splice("b"), "d"));
+    }
+    
+    @Test
+    public void testMutiaryOperator() {
+        Symbol lang = symbol("Lang");
+        Symbol method = symbol("plus");
+        Integer unit = 0;
+//        Symbol operator = symbol("+");
+        assertEquals(read("0"), multiaryOperator(lang, method, unit, NIL));
+        assertEquals(read("(invoke Lang plus 0 1)"), multiaryOperator(lang, method, unit, list(1)));
+        assertEquals(read("(invoke Lang plus 1 2)"), multiaryOperator(lang, method, unit, list(1, 2)));
+        assertEquals(read("(invoke Lang plus (invoke Lang plus 1 2) 3)"), multiaryOperator(lang, method, unit, list(1, 2, 3)));
+        assertEquals(read("(invoke Lang plus (invoke Lang plus (invoke Lang plus 1 2) 3) 4)"), multiaryOperator(lang, method, unit, list(1, 2, 3, 4)));
+        assertEquals(read("(invoke Lang plus (invoke Lang plus (invoke Lang plus (invoke Lang plus 1 2) 3) 4) 5)"),
+            multiaryOperator(lang, method, unit, list(1, 2, 3, 4, 5)));
     }
 
 }
