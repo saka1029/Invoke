@@ -11,7 +11,7 @@ public class Global {
     private Global() {
     }
 
-    private static final Env ENV = new Env(null);
+    public static final Env ENV = new Env(null);
     public static final Symbol QUOTE = Symbol.of("quote");
     public static final Symbol LAMBDA = Symbol.of("lambda");
     public static final Symbol INVOKE = Symbol.of("invoke");
@@ -25,6 +25,8 @@ public class Global {
     public static final Symbol SPLICE = Symbol.of("splice");
     public static final Symbol CASCADE = Symbol.of("@");
     public static final Symbol LANG = symbol("Lang");
+    public static final Symbol CONS = symbol("cons");
+    public static final Symbol APPEND = symbol("append");
 
     static {
         define(symbol("Boolean"), Boolean.class);
@@ -57,14 +59,14 @@ public class Global {
             new Closure(car(args), cdr(args), env)
         );
         
-        defineSyntax(BACKQUOTE, (args, env) -> backquote(car(args), env));
+//        defineSyntax(BACKQUOTE, (args, env) -> backquote(car(args), env));
         
         defineSyntax("define-macro", (args, env) ->
             car(args) instanceof Pair
-                ? env.define((Symbol)caar(args),
-                    new Macro(new Closure(cdar(args), cdr(args), env)))
-                : env.define((Symbol)car(args),
-                    new Macro((Closure)eval(cadr(args), env))));
+                ? ENV.define((Symbol)caar(args),
+                    new UserMacro(new Closure(cdar(args), cdr(args), env)))
+                : ENV.define((Symbol)car(args),
+                    new UserMacro((Closure)eval(cadr(args), env))));
 
         defineSyntax(INVOKE, (args, env) -> invoke(args, env));
         defineSyntax(FIELD, (args, env) -> field(args, env));
@@ -79,11 +81,13 @@ public class Global {
         defineMacro("cddr", LANG, "cddr", 1);
         defineMacro("cons", LANG, "cons", 2);
         defineMacro("list", LANG, "list", -1);
+        defineMacro("append", LANG, "append", -1);
         defineMacro("pair?", LANG, "pairp", 1);
         defineMacro("null?", LANG, "nullp", 1);
         defineMacro("eq?", LANG, "eqp", 2);
         defineMacro("equal?", LANG, "equalp", 2);
         defineMacro("display", LANG, "display", -1);
+        defineMacro(BACKQUOTE, (Macro) args -> backquote(car(args)));
     }
     
     static {
@@ -102,8 +106,7 @@ public class Global {
     static Object letStar(Object vars, Object body) {
         return vars == NIL
             ? list(list(LAMBDA, NIL, splice(body)))
-            : list(list(LAMBDA, splice(list(list(caar(vars)),
-                    letStar(cdr(vars), body)))),
+            : list(list(LAMBDA, splice(list(list(caar(vars)), letStar(cdr(vars), body)))),
                 cadar(vars));
     }
 
@@ -253,12 +256,12 @@ public class Global {
 //        define(symbol(name), value);
 //    }
 
-    static class NamedExpandable implements Expandable {
+    static class NamedExpandable implements Macro {
         
-        Expandable expandable;
+        Macro expandable;
         Symbol name;
 
-        NamedExpandable(Symbol name, Expandable expandable) {
+        NamedExpandable(Symbol name, Macro expandable) {
             this.expandable = expandable;
             this.name = name;
         }
@@ -277,11 +280,11 @@ public class Global {
         }
     }
 
-    static void defineMacro(Symbol symbol, Expandable value) {
+    static void defineMacro(Symbol symbol, Macro value) {
         define(symbol, new NamedExpandable(symbol, value));
     }
 
-    static void defineMacro(String name, Expandable value) {
+    static void defineMacro(String name, Macro value) {
         defineMacro(symbol(name), value);
     }
     
@@ -301,7 +304,7 @@ public class Global {
 
     static void defineMacro(String name, Symbol cls, String methodName, int argSize, Object unit) {
         Symbol method = symbol(methodName);
-        Expandable value;
+        Macro value;
         switch (argSize) {
         case -2: value = args -> multiaryOperator(cls, method, unit, args); break;
         case -1: value = args -> list(INVOKE, cls, method, splice(args)); break;
@@ -325,7 +328,8 @@ public class Global {
     }
 
     public static Object eval(Object obj) {
-        Object evaled = eval(obj, ENV);
+        Object evaled = eval(expandAll(obj), ENV);
+//        Object evaled = eval((obj), ENV);
         System.out.println("eval: " + obj + " -> " + evaled);
         return evaled;
     }
@@ -444,24 +448,91 @@ public class Global {
         }
     }
 
-    static Object backquote(Object obj, Env env) {
+    /**
+     * Syntax版backquote
+     * 事前にexpandAll()を使ってマクロ展開するのが難しい
+     */
+//    static Object backquote(Object obj, Env env) {
+//        if (obj instanceof Pair)
+//            if (car(obj) instanceof Pair)
+//                if (caar(obj) == UNQUOTE)
+//                    return cons(
+//                        eval(cadar(obj), env),
+//                        backquote(cdr(obj), env));
+//                else if (car(car(obj)) == SPLICE)
+//                    return append(
+//                        eval(cadar(obj), env),
+//                        backquote(cdr(obj), env));
+//                else
+//                    return cons(
+//                        backquote(car(obj), env),
+//                        backquote(cdr(obj), env));
+//            else
+//                return cons(car(obj), backquote(cdr(obj), env));
+//        else
+//            return obj;
+//    }
+
+    /**
+     * マクロ版のbackquote
+     * @param obj
+     * @return
+     */
+    public static Object backquote(Object obj) {
         if (obj instanceof Pair)
             if (car(obj) instanceof Pair)
                 if (caar(obj) == UNQUOTE)
-                    return cons(
-                        eval(cadar(obj), env),
-                        backquote(cdr(obj), env));
+//                    return cons(
+//                        eval(cadar(obj), env),
+//                        backquote(cdr(obj), env));
+                    return list(CONS, cadar(obj), backquote(cdr(obj)));
                 else if (car(car(obj)) == SPLICE)
-                    return append(
-                        eval(cadar(obj), env),
-                        backquote(cdr(obj), env));
+//                    return append(
+//                        eval(cadar(obj), env),
+//                        backquote(cdr(obj), env));
+                    return list(APPEND, cadar(obj), backquote(cdr(obj)));
                 else
-                    return cons(
-                        backquote(car(obj), env),
-                        backquote(cdr(obj), env));
+//                    return cons(
+//                        backquote(car(obj), env),
+//                        backquote(cdr(obj), env));
+                    return list(CONS, backquote(car(obj)), backquote(cdr(obj)));
             else
-                return cons(car(obj), backquote(cdr(obj), env));
+//                return cons(car(obj), backquote(cdr(obj), env));
+                return list(CONS, list(QUOTE, car(obj)), backquote(cdr(obj)));
         else
-            return obj;
+//            return obj;
+            return list(QUOTE, obj);
     }
+    
+    static Object expandAllArgs(Object exp) {
+        return map(x -> expandAll(x), exp);
+    }
+
+    public static Object expandAll(Object exp) {
+        if (!(exp instanceof Pair)) 
+            return exp;
+        Object head = ((Pair)exp).car();
+        Object tail = ((Pair)exp).cdr();
+        if (head instanceof Pair)
+            return map(x -> expandAll(x), exp);
+        if (!(head instanceof Symbol))
+            throw new IllegalArgumentException("exp: " +exp);
+        Object applicable = ENV.getValue((Symbol)head);
+        if (applicable instanceof Macro)
+            return expandAll(((Macro)applicable).expand(tail));
+        if (head == QUOTE)
+            return exp;
+        if (head == symbol("invoke"))
+            return list(head, expandAll(car(tail)), cadr(tail), splice(expandAllArgs(cddr(tail))));
+        if (head == symbol("field"))
+            return list(head, expandAll(car(tail)), cadr(tail));
+        if (head == symbol("if"))
+            return list(head, splice(expandAllArgs(tail)));
+        if (head == symbol("lambda"))
+            return list(head, car(tail), splice(expandAllArgs(cdr(tail))));
+        if (head == symbol("define") || head == symbol("define-macro") || head == symbol("set!"))
+            return list(head, car(tail), expandAll(cadr(tail)));
+        return map(x -> expandAll(x), exp);
+    }
+
 }

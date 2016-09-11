@@ -1,16 +1,7 @@
 package invoke;
 
-import static invoke.Global.*;
+public interface Expandable {
 
-public interface Expandable extends Applicable {
+    Object expand(Env menv);
     
-    Object expand(Object args);
-    
-    @Override
-    default Object apply(Object args, Env env) {
-        Object expanded = expand(args);
-        System.out.println("expand: " + args + " -> " + expanded);
-        return eval(expanded, env);
-    }
-
 }

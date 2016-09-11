@@ -3,6 +3,8 @@ package invoke;
 import static invoke.Global.*;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 public class Reader {
 
@@ -90,12 +92,16 @@ public class Reader {
         }
     }
     
-    Integer readNumber(StringBuilder sb) {
+    Number readNumber(StringBuilder sb) {
         while (isDigit(ch)) {
             sb.append((char)ch);
             get();
         }
-        return Integer.parseInt(sb.toString());
+        switch (Character.toUpperCase(ch)) {
+        case 'L': get(); return Long.parseLong(sb.toString());
+        case 'I': get(); return new BigInteger(sb.toString());
+        default: return Integer.parseInt(sb.toString());
+        }
     }
     
     String readString(StringBuilder sb) {
