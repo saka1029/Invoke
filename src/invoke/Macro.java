@@ -1,16 +1,16 @@
 package invoke;
 
-public class Macro implements Expandable {
+import static invoke.Global.*;
 
-    private final Closure closure;
+public interface Macro extends Applicable {
     
-    Macro(Closure closure) {
-        this.closure = closure;
-    }
-
+    Object expand(Object args);
+    
     @Override
-    public Object expand(Object args) {
-        return closure.apply(args);
+    default Object apply(Object args, Env env) {
+        Object expanded = expand(args);
+        System.out.println("expand: " + args + " -> " + expanded);
+        return eval(expanded, env);
     }
 
 }

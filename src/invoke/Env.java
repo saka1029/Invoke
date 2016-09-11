@@ -23,6 +23,13 @@ public class Env {
         return find(key).map.get(key);
     }
     
+    public Object getValue(Symbol key) {
+        Object r = map.get(key);
+        if (r == null && next != null)
+            r = next.map.get(key);
+        return r;
+    }
+    
     public Object set(Symbol key, Object value) {
         find(key).map.put(key, value);
         return Global.UNDEF;
