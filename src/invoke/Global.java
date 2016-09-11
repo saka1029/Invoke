@@ -3,6 +3,7 @@ package invoke;
 import java.io.StringReader;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
 import java.util.function.UnaryOperator;
 import reflection.Reflection;
 
@@ -36,6 +37,7 @@ public class Global {
         define(symbol("int"), Integer.TYPE);
         define(symbol("System"), System.class);
         define(symbol("Array"), Array.class);
+        define(symbol("Arrays"), Arrays.class);
         define(LANG, Lang.class);
     }
     
@@ -72,7 +74,12 @@ public class Global {
         defineSyntax(FIELD, (args, env) -> field(args, env));
     }
     
-    static {
+    static { 
+        defineMacro("iif", (Macro) args ->
+            cddr(args) == NIL
+                ? list(INVOKE, LANG, symbol("iif"), car(args), list(LAMBDA, NIL, cadr(args)))
+                : list(INVOKE, LANG, symbol("iif"), car(args), list(LAMBDA, NIL, cadr(args)),
+                    list(LAMBDA, NIL, caddr(args))));
         defineMacro("car", LANG, "car", 1);
         defineMacro("cdr", LANG, "cdr", 1);
         defineMacro("caar", LANG, "caar", 1);
@@ -88,6 +95,7 @@ public class Global {
         defineMacro("equal?", LANG, "equalp", 2);
         defineMacro("display", LANG, "display", -1);
         defineMacro(BACKQUOTE, (Macro) args -> backquote(car(args)));
+        defineMacro("length", LANG, "length", 1);
     }
     
     static {
@@ -256,12 +264,12 @@ public class Global {
 //        define(symbol(name), value);
 //    }
 
-    static class NamedExpandable implements Macro {
+    static class NamedMacro implements Macro {
         
         Macro expandable;
         Symbol name;
 
-        NamedExpandable(Symbol name, Macro expandable) {
+        NamedMacro(Symbol name, Macro expandable) {
             this.expandable = expandable;
             this.name = name;
         }
@@ -281,7 +289,7 @@ public class Global {
     }
 
     static void defineMacro(Symbol symbol, Macro value) {
-        define(symbol, new NamedExpandable(symbol, value));
+        define(symbol, new NamedMacro(symbol, value));
     }
 
     static void defineMacro(String name, Macro value) {
@@ -328,8 +336,8 @@ public class Global {
     }
 
     public static Object eval(Object obj) {
-        Object evaled = eval(expandAll(obj), ENV);
-//        Object evaled = eval((obj), ENV);
+//        Object evaled = eval(expandAll(obj), ENV);
+        Object evaled = eval((obj), ENV);
         System.out.println("eval: " + obj + " -> " + evaled);
         return evaled;
     }

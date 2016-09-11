@@ -27,7 +27,8 @@ public class Main {
                 if (evaled != UNDEF)
                     System.out.println(evaled);
             } catch (Exception e) {
-                System.err.println("! " + e.getClass().getSimpleName() + ": "+ e.getMessage());
+                for (Throwable f = e; f != null; f = f.getCause())
+                    System.err.println("! " + f.getClass().getSimpleName() + ": "+ f.getMessage());
             }
         }
     }

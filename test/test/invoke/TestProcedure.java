@@ -76,5 +76,15 @@ public class TestProcedure {
     public void testDisplay() {
         assertEquals(read("*UNDEF*"), eval(read("(display 'a 'b)")));
     }
+    
+    @Test
+    public void testLength() {
+        assertEquals(read("2"), eval(read("(length \"ab\")")));
+    }
+    
+    @Test
+    public void testLengthArray() {
+        assertEquals(read("2"), eval(read("(length (@ Array (newInstance int 2)))")));
+    }
   
 }

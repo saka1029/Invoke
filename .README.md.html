@@ -640,15 +640,61 @@ function setDocumentScrollTop(ypos)
 </head>
 <body class="markdown-body">
 <h1> <a id="invoke" class="anchor" href="#invoke" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Invoke</h1> 
-<h2> <a id="intのオーバーフロー検出" class="anchor" href="#int%E3%81%AE%E3%82%AA%E3%83%BC%E3%83%90%E3%83%BC%E3%83%95%E3%83%AD%E3%83%BC%E6%A4%9C%E5%87%BA" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>intのオーバーフロー検出</h2> 
-<pre><code>static final int safeMultiply(int left, int right) throws ArithmeticException {
-  if (right &gt; 0 ? left &gt; Integer.MAX_VALUE/right || left &lt; Integer.MIN_VALUE/right :
-      (right &lt; -1 ? left &gt; Integer.MIN_VALUE/right || left &lt; Integer.MAX_VALUE/right :
-      right == -1 &amp;&amp; left == Integer.Min_VALUE) ) {
-    throw new ArithmeticException(&quot;Integer overflow&quot;);
-  }
-  return left * right;
-}
-</code></pre>
+<h2> <a id="関数はマクロで実装" class="anchor" href="#%E9%96%A2%E6%95%B0%E3%81%AF%E3%83%9E%E3%82%AF%E3%83%AD%E3%81%A7%E5%AE%9F%E8%A3%85" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>「+」関数はマクロで実装</h2> 
+<p>「+」マクロの定義は以下のようになっている。</p> 
+<pre><code>    defineMacro(&quot;+&quot;, LANG, &quot;plus&quot;, -2, 0);
+
+    public static Object multiaryOperator(Symbol self, Symbol method, Object unit, Object args) {
+        Object prev = null;
+        int i = 0;
+        for (; args instanceof Pair; args = cdr(args)) {
+            Object e = car(args);
+            switch (i++) {
+            case 0: prev = e; break;
+            case 1: unit = prev; break;
+            }
+            unit = list(INVOKE, self, method, unit, e);
+        }
+        return unit;
+    }
+
+    static void defineMacro(String name, Symbol cls, String methodName, int argSize, Object unit) {
+        Symbol method = symbol(methodName);
+        Macro value;
+        switch (argSize) {
+        case -2: value = args -&gt; multiaryOperator(cls, method, unit, args); break;
+        case -1: value = args -&gt; list(INVOKE, cls, method, splice(args)); break;
+        case 0: value = args -&gt; list(INVOKE, cls, method); break;
+        case 1: value = args -&gt; list(INVOKE, cls, method, car(args)); break;
+        case 2: value = args -&gt; list(INVOKE, cls, method, car(args), cadr(args)); break;
+        case 3: value = args -&gt; list(INVOKE, cls, method, car(args), cadr(args), caddr(args)); break;
+        default: throw new IllegalArgumentException(&quot;too many args&quot;);
+        }
+        defineMacro(name, value);
+    }
+
+    static void defineMacro(String name, Symbol cls, String methodName, int argSize) {
+        defineMacro(name, cls, methodName, argSize, null);
+    }
+
+</code></pre> 
+<p>これにより以下のようにマクロ展開される</p> 
+<pre><code>(+) -&gt; 0
+(+ 2) -&gt; (invoke Lang plus 0 2)
+(+ 2 3) -&gt; (invoke Lang plus 2 3)
+(+ 2 3 4) -&gt; (invoke Lang plus (invoke Lang plus 2 3) 4)
+</code></pre> 
+<p><code>(invoke OBJECT METHOD ARGS...)</code>は<code>ARGS</code>を<code>OBJECT</code>の<code>METHOD</code>に対して適用する。</p> 
+<p>Langクラスには以下のstaticメソッドがあるのでinvokeはこれを呼び出している。</p> 
+<pre><code>    public static int plus(int a, int b) { return a + b; }
+</code></pre> 
+<p>Langクラスに以下を追加すると</p> 
+<pre><code>    public static String plus(String a, Object b) { return a + b; }
+</code></pre> 
+<p>こんなことができるようになる。</p> 
+<pre><code>(+ &quot;abc&quot; &quot;def&quot;) -&gt; &quot;abcdef&quot;
+(+ abc 123 456) -&gt; &quot;abc123456&quot;
+</code></pre> 
+<p>ここで「+」演算子はジェネリックな関数となっている。</p>
 </body>
 </html>
