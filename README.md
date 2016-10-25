@@ -10,9 +10,9 @@
     public static Object multiaryOperator(Symbol self, Symbol method, Object unit, Object args) {
         Object prev = null;
         int i = 0;
-        for (; args instanceof Pair; args = cdr(args)) {
+        for (; args instanceof Pair; args = cdr(args), ++i) {
             Object e = car(args);
-            switch (i++) {
+            switch (i) {
             case 0: prev = e; break;
             case 1: unit = prev; break;
             }
@@ -72,4 +72,4 @@ Langクラスに以下を追加すると
 (+ abc 123 456) -> "abc123456"
 ```
 
-ここで「+」演算子はジェネリックな関数となっている。
+「+」演算子は実質的にジェネリックな関数となる。

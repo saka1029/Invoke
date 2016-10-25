@@ -14,17 +14,22 @@ public class TestBackquoteMacro {
     
     @Test
     public void testUnquote() {
-        assertEquals(read("(cons b (cons 'c '()))"), backquote(read("(,b c)")));
+        assertEquals(read("(cons b (list 'c))"), backquote(read("(,b c)")));
+    }
+    
+    @Test
+    public void testUnquote2() {
+        assertEquals(read("(cons a (cons 'b (list 'c)))"), backquote(read("(,a b c)")));
     }
     
     @Test
     public void testSplicing() {
-        assertEquals(read("(append b (cons 'c '()))"), backquote(read("(,@b c)")));
+        assertEquals(read("(append b (list 'c))"), backquote(read("(,@b c)")));
     }
     
     @Test
     public void testSplicing2() {
-        assertEquals(read("(append a (cons 'b (append c '())))"), backquote(read("(,@a b ,@c)")));
+        assertEquals(read("(append a (cons 'b c))"), backquote(read("(,@a b ,@c)")));
     }
 
 }

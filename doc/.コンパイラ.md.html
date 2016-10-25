@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>C:\git\Invoke\.README.md.html</title>
+<title>C:\git\Invoke\doc\.コンパイラ.md.html</title>
 
 
 <style type="text/css">
@@ -639,62 +639,12 @@ function setDocumentScrollTop(ypos)
 
 </head>
 <body class="markdown-body">
-<h1> <a id="invoke" class="anchor" href="#invoke" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Invoke</h1> 
-<h2> <a id="関数はマクロで実装" class="anchor" href="#%E9%96%A2%E6%95%B0%E3%81%AF%E3%83%9E%E3%82%AF%E3%83%AD%E3%81%A7%E5%AE%9F%E8%A3%85" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>「+」関数はマクロで実装</h2> 
-<p>「+」マクロの定義は以下のようになっている。</p> 
-<pre><code>    defineMacro(&quot;+&quot;, LANG, &quot;plus&quot;, -2, 0);
-
-    public static Object multiaryOperator(Symbol self, Symbol method, Object unit, Object args) {
-        Object prev = null;
-        int i = 0;
-        for (; args instanceof Pair; args = cdr(args), ++i) {
-            Object e = car(args);
-            switch (i) {
-            case 0: prev = e; break;
-            case 1: unit = prev; break;
-            }
-            unit = list(INVOKE, self, method, unit, e);
-        }
-        return unit;
-    }
-
-    static void defineMacro(String name, Symbol cls, String methodName, int argSize, Object unit) {
-        Symbol method = symbol(methodName);
-        Macro value;
-        switch (argSize) {
-        case -2: value = args -&gt; multiaryOperator(cls, method, unit, args); break;
-        case -1: value = args -&gt; list(INVOKE, cls, method, splice(args)); break;
-        case 0: value = args -&gt; list(INVOKE, cls, method); break;
-        case 1: value = args -&gt; list(INVOKE, cls, method, car(args)); break;
-        case 2: value = args -&gt; list(INVOKE, cls, method, car(args), cadr(args)); break;
-        case 3: value = args -&gt; list(INVOKE, cls, method, car(args), cadr(args), caddr(args)); break;
-        default: throw new IllegalArgumentException(&quot;too many args&quot;);
-        }
-        defineMacro(name, value);
-    }
-
-    static void defineMacro(String name, Symbol cls, String methodName, int argSize) {
-        defineMacro(name, cls, methodName, argSize, null);
-    }
-
-</code></pre> 
-<p>これにより以下のようにマクロ展開される</p> 
-<pre><code>(+) -&gt; 0
-(+ 2) -&gt; (invoke Lang plus 0 2)
-(+ 2 3) -&gt; (invoke Lang plus 2 3)
-(+ 2 3 4) -&gt; (invoke Lang plus (invoke Lang plus 2 3) 4)
-</code></pre> 
-<p><code>(invoke OBJECT METHOD ARGS...)</code>は<code>ARGS</code>を<code>OBJECT</code>の<code>METHOD</code>に対して適用する。</p> 
-<p>Langクラスには以下のstaticメソッドがあるのでinvokeはこれを呼び出している。</p> 
-<pre><code>    public static int plus(int a, int b) { return a + b; }
-</code></pre> 
-<p>Langクラスに以下を追加すると</p> 
-<pre><code>    public static String plus(String a, Object b) { return a + b; }
-</code></pre> 
-<p>こんなことができるようになる。</p> 
-<pre><code>(+ &quot;abc&quot; &quot;def&quot;) -&gt; &quot;abcdef&quot;
-(+ abc 123 456) -&gt; &quot;abc123456&quot;
-</code></pre> 
-<p>「+」演算子は実質的にジェネリックな関数となる。</p>
+<h1> <a id="コンパイラ" class="anchor" href="#%E3%82%B3%E3%83%B3%E3%83%91%E3%82%A4%E3%83%A9" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>コンパイラ</h1> 
+<h2> <a id="実行プロセス" class="anchor" href="#%E5%AE%9F%E8%A1%8C%E3%83%97%E3%83%AD%E3%82%BB%E3%82%B9" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>実行プロセス</h2> 
+<ol> 
+ <li>コンパイル ソースプログラム上は全く型の指定がない。 定数のみ型が判明している。 ただし、組み込み関数の呼び出しでどの変数がどの型を取りうるかの制約をコンパイル時に 明確にする。</li> 
+ <li>実行 型がコンパイル時に決まっている関数呼び出しと決まっていない関数呼び出しがある。 実行時に型を決定する。</li> 
+</ol> 
+<h2> <a id="型表現" class="anchor" href="#%E5%9E%8B%E8%A1%A8%E7%8F%BE" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>型表現</h2>
 </body>
 </html>

@@ -38,6 +38,7 @@ public class TestExpandAll {
 
     @Test
     public void test() {
+        assertEquals(read("0"), expandAll(read("(+)")));
         assertEquals(read("(if (invoke Lang lt 1 n) x y)"), expandAll(read("(if (< 1 n) x y)")));
         assertEquals(read("'(+ 1 2)"), expandAll(read("'(+ 1 2)")));
         assertEquals(read("(invoke Lang car '(a b))"), expandAll(read("(car '(a b))")));
@@ -56,6 +57,28 @@ public class TestExpandAll {
                 + "  (if (<= n 1)"
                 + "      1"
                 + "      (* n (fact (- n 1)))))")));
+    }
+    
+    @Test
+    public void testBackquote() {
+        assertEquals(read("(invoke Lang cons"
+            + " 'a"
+            + " (invoke Lang cons"
+            + "   (invoke Lang plus 1 2)"
+            + "   (invoke Lang list 'c)))"), expandAll(read("`(a ,(+ 1 2) c)")));
+        assertEquals(read("(invoke Lang cons"
+            + " 'a"
+            + " (invoke Lang append"
+            + "   (invoke Lang plus 1 2)"
+            + "   (invoke Lang list 'c)))"), expandAll(read("`(a ,@(+ 1 2) c)")));
+    }
+    
+    @Test
+    public void testIif() {
+        assertEquals(read("(invoke Lang iif"
+            + " (invoke Lang lt a b)"
+            + " (lambda () a)"
+            + " (lambda () b))"), expandAll(read("(iif (< a b) a b)")));
     }
     
 }

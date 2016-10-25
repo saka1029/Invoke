@@ -27,6 +27,7 @@ public class Global {
     public static final Symbol CASCADE = Symbol.of("@");
     public static final Symbol LANG = symbol("Lang");
     public static final Symbol CONS = symbol("cons");
+    public static final Symbol LIST = symbol("list");
     public static final Symbol APPEND = symbol("append");
 
     static {
@@ -299,9 +300,9 @@ public class Global {
     public static Object multiaryOperator(Symbol self, Symbol method, Object unit, Object args) {
         Object prev = null;
         int i = 0;
-        for (; args instanceof Pair; args = cdr(args)) {
+        for (; args instanceof Pair; args = cdr(args), ++i) {
             Object e = car(args);
-            switch (i++) {
+            switch (i) {
             case 0: prev = e; break;
             case 1: unit = prev; break;
             }
@@ -483,32 +484,31 @@ public class Global {
 
     /**
      * マクロ版のbackquote
-     * @param obj
-     * @return
      */
     public static Object backquote(Object obj) {
         if (obj instanceof Pair)
             if (car(obj) instanceof Pair)
                 if (caar(obj) == UNQUOTE)
-//                    return cons(
-//                        eval(cadar(obj), env),
-//                        backquote(cdr(obj), env));
-                    return list(CONS, cadar(obj), backquote(cdr(obj)));
-                else if (car(car(obj)) == SPLICE)
-//                    return append(
-//                        eval(cadar(obj), env),
-//                        backquote(cdr(obj), env));
-                    return list(APPEND, cadar(obj), backquote(cdr(obj)));
+                    if (cdr(obj) == NIL)
+                        return list(LIST, cadar(obj));
+                    else
+                        return list(CONS, cadar(obj), backquote(cdr(obj)));
+                else if (caar(obj) == SPLICE)
+                    if (cdr(obj) == NIL)
+                        return cadar(obj);
+                    else
+                        return list(APPEND, cadar(obj), backquote(cdr(obj)));
                 else
-//                    return cons(
-//                        backquote(car(obj), env),
-//                        backquote(cdr(obj), env));
-                    return list(CONS, backquote(car(obj)), backquote(cdr(obj)));
+                    if (cdr(obj) == NIL)
+                        return list(LIST, backquote(car(obj)));
+                    else
+                        return list(CONS, backquote(car(obj)), backquote(cdr(obj)));
             else
-//                return cons(car(obj), backquote(cdr(obj), env));
-                return list(CONS, list(QUOTE, car(obj)), backquote(cdr(obj)));
+                if (cdr(obj) == NIL)
+                    return list(LIST, list(QUOTE, car(obj)));
+                else
+                    return list(CONS, list(QUOTE, car(obj)), backquote(cdr(obj)));
         else
-//            return obj;
             return list(QUOTE, obj);
     }
     
